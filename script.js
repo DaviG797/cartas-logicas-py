@@ -260,6 +260,10 @@ window.Game = {
     draggedCardId: null,
     isRunning: false,
     completedLevels: [],
+    levelScores: {},
+    elapsedSeconds: 0,
+    timerInterval: null,
+    failedAttempts: 0,
     settings: {
         sfx: true,
         music: false,
@@ -284,6 +288,8 @@ window.Game = {
         try {
             var savedCompleted = localStorage.getItem('cartasLogicas_completed');
             if (savedCompleted) this.completedLevels = JSON.parse(savedCompleted);
+            var savedScores = localStorage.getItem('cartasLogicas_scores');
+            if (savedScores) this.levelScores = JSON.parse(savedScores);
             var savedSettings = localStorage.getItem('cartasLogicas_settings');
             if (savedSettings) {
                 var parsed = JSON.parse(savedSettings);
@@ -295,13 +301,60 @@ window.Game = {
     saveStorage: function() {
         try {
             localStorage.setItem('cartasLogicas_completed', JSON.stringify(this.completedLevels));
+            localStorage.setItem('cartasLogicas_scores', JSON.stringify(this.levelScores));
             localStorage.setItem('cartasLogicas_settings', JSON.stringify(this.settings));
         } catch (e) {}
+    },
+
+    getTotalScore: function() {
+        var total = 0;
+        for (var k in this.levelScores) {
+            if (this.levelScores.hasOwnProperty(k)) {
+                total += Number(this.levelScores[k]) || 0;
+            }
+        }
+        return total;
+    },
+
+    formatTime: function(sec) {
+        var m = Math.floor(sec / 60);
+        var s = sec % 60;
+        var mStr = m < 10 ? "0" + m : "" + m;
+        var sStr = s < 10 ? "0" + s : "" + s;
+        return mStr + ":" + sStr;
+    },
+
+    startTimer: function() {
+        var self = this;
+        this.stopTimer();
+        this.timerInterval = setInterval(function() {
+            self.elapsedSeconds++;
+            var el = document.getElementById('game-timer');
+            if (el) el.textContent = "Tempo: " + self.formatTime(self.elapsedSeconds);
+        }, 1000);
+    },
+
+    stopTimer: function() {
+        if (this.timerInterval) {
+            clearInterval(this.timerInterval);
+            this.timerInterval = null;
+        }
+    },
+
+    calculateLevelScore: function(lvl) {
+        var base = lvl.difficulty === "Fácil" ? 500 : (lvl.difficulty === "Médio" ? 1000 : 1500);
+        var decayPerSec = lvl.difficulty === "Fácil" ? 10 : (lvl.difficulty === "Médio" ? 7 : 5);
+        var speedBonus = Math.max(0, 500 - (this.elapsedSeconds * decayPerSec));
+        var penalty = this.failedAttempts * 100;
+        return Math.max(100, base + speedBonus - penalty);
     },
 
     showScreen: function(screenId) {
         Sound.click();
         this.hideFeedback();
+        if (screenId !== 'screen-game') {
+            this.stopTimer();
+        }
         var screens = document.querySelectorAll('.screen');
         for (var i = 0; i < screens.length; i++) {
             screens[i].classList.remove('active');
@@ -311,6 +364,7 @@ window.Game = {
         if (screenId === 'screen-levels') {
             this.renderLevelsGrid();
         }
+        window.scrollTo(0, 0);
     },
 
     isLevelUnlocked: function(levelId) {
@@ -323,6 +377,11 @@ window.Game = {
         var container = document.getElementById('levels-grid');
         if (!container) return;
         container.innerHTML = '';
+
+        var totalBanner = document.getElementById('total-score-banner');
+        if (totalBanner) {
+            totalBanner.textContent = "Pontos: " + this.getTotalScore();
+        }
 
         var rows = [
             { label: 'Fácil', range: [1, 2, 3, 4, 5] },
@@ -340,15 +399,35 @@ window.Game = {
                     var btn = document.createElement('button');
                     btn.type = 'button';
                     btn.className = 'level-btn';
-                    btn.textContent = lvlId;
+
+                    var numSpan = document.createElement('span');
+                    numSpan.textContent = lvlId;
+                    btn.appendChild(numSpan);
 
                     var completed = self.completedLevels.indexOf(lvlId) !== -1;
                     var unlocked = self.isLevelUnlocked(lvlId);
 
-                    if (completed) btn.classList.add('completed');
+                    if (completed) {
+                        btn.classList.add('completed');
+                        if (self.levelScores[lvlId]) {
+                            var scoreTag = document.createElement('span');
+                            scoreTag.className = 'level-score-tag';
+                            scoreTag.textContent = self.levelScores[lvlId] + ' pts';
+                            btn.appendChild(scoreTag);
+                        }
+                    }
+
                     if (!unlocked) {
                         btn.classList.add('locked');
                         btn.title = "Complete o nível anterior para desbloquear";
+                        var svgNS = "http://www.w3.org/2000/svg";
+                        var lockSvg = document.createElementNS(svgNS, "svg");
+                        lockSvg.setAttribute("viewBox", "0 0 24 24");
+                        lockSvg.setAttribute("class", "lock-svg");
+                        var path = document.createElementNS(svgNS, "path");
+                        path.setAttribute("d", "M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6z");
+                        lockSvg.appendChild(path);
+                        btn.appendChild(lockSvg);
                     } else {
                         btn.onclick = function() { self.startLevel(lvlId); };
                     }
@@ -389,8 +468,14 @@ window.Game = {
         for (var i = 0; i < lvl.slots; i++) this.slotState.push(null);
         this.selectedCardId = null;
         this.isRunning = false;
+        this.elapsedSeconds = 0;
+        this.failedAttempts = 0;
 
-        document.getElementById('game-level-indicator').textContent = "Nível " + lvl.id + " — " + lvl.difficulty;
+        document.getElementById('game-level-indicator').textContent = "Nível " + lvl.id + " - " + lvl.difficulty;
+        document.getElementById('game-timer').textContent = "Tempo: 00:00";
+        var best = this.levelScores[lvl.id] || 0;
+        document.getElementById('game-best-score').textContent = "Recorde: " + best + " pts";
+
         document.getElementById('game-prompt').textContent =
             "Sabendo que " + lvl.varsText + ", selecione as cartas para os locais corretos para chegar a resposta.";
         document.getElementById('target-output').textContent = "R: " + lvl.target;
@@ -400,6 +485,7 @@ window.Game = {
         this.hideFeedback();
         this.renderBoard();
         this.showScreen('screen-game');
+        this.startTimer();
     },
 
     renderBoard: function() {
@@ -451,7 +537,7 @@ window.Game = {
                 if (slotIdx < self.slotState.length - 1) {
                     var arrow = document.createElement('span');
                     arrow.className = 'flow-symbol';
-                    arrow.textContent = '➡';
+                    arrow.textContent = '→';
                     slotsContainer.appendChild(arrow);
                 }
             })(idx);
@@ -559,7 +645,7 @@ window.Game = {
         Sound.click();
         for (var i = 0; i < this.slotState.length; i++) this.slotState[i] = null;
         this.selectedCardId = null;
-        this.hideFeedback();
+        this.clearStepVisuals();
         this.renderBoard();
     },
 
@@ -580,25 +666,33 @@ window.Game = {
         if (winModal) winModal.classList.remove('active');
     },
 
-    showFeedback: function(isSuccess, message) {
-        if (isSuccess) {
-            var winModal = document.getElementById('win-modal');
-            var modalTitle = document.getElementById('win-modal-title');
-            var modalText = document.getElementById('win-modal-text');
-            var nextBtn = document.getElementById('btn-next-level');
+    showWinModal: function(earnedScore) {
+        var winModal = document.getElementById('win-modal');
+        var heading = document.getElementById('win-modal-heading');
+        var timeStat = document.getElementById('win-stat-time');
+        var scoreStat = document.getElementById('win-stat-score');
+        var nextBtn = document.getElementById('btn-next-level');
 
-            var isLastLevel = this.currentLevelObj.id >= LEVELS.length;
-            modalTitle.textContent = isLastLevel ? "🏆 Jogo Concluído!" : "✅ Nível " + this.currentLevelObj.id + " Concluído!";
-            modalText.textContent = message;
-            nextBtn.style.display = isLastLevel ? 'none' : 'inline-block';
-
-            winModal.classList.add('active');
+        var isLastLevel = this.currentLevelObj.id >= LEVELS.length;
+        if (isLastLevel) {
+            heading.innerHTML = "Sucesso!<br>Todos os níveis concluídos!";
+            nextBtn.style.display = 'none';
         } else {
-            var bar = document.getElementById('feedback-bar');
-            var txt = document.getElementById('feedback-text');
-            bar.className = 'feedback-bar error';
-            txt.textContent = message;
+            heading.innerHTML = "Sucesso!<br>Avançar para o próximo nível?";
+            nextBtn.style.display = 'inline-flex';
         }
+
+        timeStat.textContent = "Tempo: " + this.formatTime(this.elapsedSeconds);
+        scoreStat.textContent = "Pontos: +" + earnedScore;
+
+        winModal.classList.add('active');
+    },
+
+    showErrorFeedback: function(message) {
+        var bar = document.getElementById('feedback-bar');
+        var txt = document.getElementById('feedback-text');
+        bar.className = 'feedback-bar error';
+        txt.textContent = message;
     },
 
     runCode: function() {
@@ -609,12 +703,13 @@ window.Game = {
         for (var s = 0; s < this.slotState.length; s++) {
             if (this.slotState[s] === null) {
                 Sound.error();
-                this.showFeedback(false, "⚠️ Preencha todos os espaços vazios antes de clicar em Run!");
+                this.showErrorFeedback("Preencha todos os espaços vazios antes de clicar em Run.");
                 return;
             }
         }
 
         this.isRunning = true;
+        this.stopTimer();
         document.getElementById('btn-run').disabled = true;
 
         var lvl = this.currentLevelObj;
@@ -631,18 +726,27 @@ window.Game = {
                 if (vars.c === lvl.target) {
                     actualEl.style.color = '#22c55e';
                     Sound.win();
+
+                    var earnedScore = self.calculateLevelScore(lvl);
+                    var prevBest = self.levelScores[lvl.id] || 0;
+                    if (earnedScore > prevBest) {
+                        self.levelScores[lvl.id] = earnedScore;
+                    }
                     if (self.completedLevels.indexOf(lvl.id) === -1) {
                         self.completedLevels.push(lvl.id);
-                        self.saveStorage();
                     }
-                    var msg = (lvl.id === LEVELS.length)
-                        ? "Parabéns! Você concluiu todos os 15 níveis do Cartas Lógicas.py!"
-                        : "Perfeito! O código imprimiu R: " + vars.c + " exatamente como esperado!";
-                    self.showFeedback(true, msg);
+                    self.saveStorage();
+
+                    document.getElementById('game-best-score').textContent =
+                        "Recorde: " + self.levelScores[lvl.id] + " pts";
+
+                    self.showWinModal(earnedScore);
                 } else {
                     actualEl.style.color = '#ef4444';
+                    self.failedAttempts++;
                     Sound.error();
-                    self.showFeedback(false, "❌ Quase lá! Seu código resultou em R: " + vars.c + ", mas o objetivo é R: " + lvl.target + ".");
+                    self.showErrorFeedback("Resultado incorreto: seu código gerou R: " + vars.c + ", mas o esperado é R: " + lvl.target + ".");
+                    self.startTimer();
                 }
 
                 self.isRunning = false;
@@ -672,10 +776,12 @@ window.Game = {
                     errBubble.textContent = 'NameError!';
                     slotEl.appendChild(errBubble);
 
+                    self.failedAttempts++;
                     Sound.error();
-                    self.showFeedback(false, "❌ Erro no Espaço #" + (stepIndex + 1) + ": " + errMsg);
+                    self.showErrorFeedback("Erro no Espaço #" + (stepIndex + 1) + ": " + errMsg);
                     self.isRunning = false;
                     document.getElementById('btn-run').disabled = false;
+                    self.startTimer();
                     return;
                 }
 
@@ -738,9 +844,10 @@ window.Game = {
     resetProgress: function() {
         Sound.click();
         this.completedLevels = [];
+        this.levelScores = {};
         this.saveStorage();
         this.renderLevelsGrid();
-        alert("Progresso de níveis resetado com sucesso!");
+        alert("Progresso e pontuações resetados com sucesso!");
     }
 };
 

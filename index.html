@@ -21,9 +21,11 @@
     <!-- TELA 2: SELECIONAR NÍVEL -->
     <section id="screen-levels" class="screen">
         <div class="screen-header">
-            <button type="button" class="nav-btn" onclick="window.Game.showScreen('screen-menu')">⬅ Menu</button>
+            <button type="button" class="nav-btn" onclick="window.Game.showScreen('screen-menu')">
+                <span class="back-arrow">←</span> Menu
+            </button>
             <h2 class="screen-title">Selecionar Nível</h2>
-            <div style="width: 85px;"></div>
+            <div class="score-summary-banner" id="total-score-banner">Pontos: 0</div>
         </div>
 
         <div class="levels-container" id="levels-grid"></div>
@@ -32,11 +34,15 @@
     <!-- TELA 3: JOGO -->
     <section id="screen-game" class="screen">
         <div class="game-top-bar">
-            <button type="button" class="nav-btn" onclick="window.Game.showScreen('screen-levels')">⬅ Níveis</button>
-            <span class="level-badge" id="game-level-indicator">Nível 1 - Fácil</span>
-            <div style="display: flex; gap: 10px;">
-                <button type="button" class="nav-btn" onclick="window.Game.clearSlots()">🔄 Limpar Cartas</button>
+            <button type="button" class="nav-btn" onclick="window.Game.showScreen('screen-levels')">
+                <span class="back-arrow">←</span> Níveis
+            </button>
+            <div class="hud-metrics">
+                <span class="level-badge" id="game-level-indicator">Nível 1 - Fácil</span>
+                <span class="timer-badge" id="game-timer">Tempo: 00:00</span>
+                <span class="score-badge" id="game-best-score">Recorde: 0 pts</span>
             </div>
+            <button type="button" class="nav-btn" onclick="window.Game.clearSlots()">Limpar Cartas</button>
         </div>
 
         <div class="problem-prompt" id="game-prompt"></div>
@@ -69,23 +75,30 @@
 
     <!-- MODAL CENTRAL DE VITÓRIA -->
     <div class="win-modal-overlay" id="win-modal">
-        <div class="win-modal-box">
-            <div class="win-modal-icon">🎉</div>
-            <div class="win-modal-title" id="win-modal-title">Nível Concluído!</div>
-            <div class="win-modal-text" id="win-modal-text"></div>
+        <div class="win-modal-pill">
+            <div class="win-modal-heading" id="win-modal-heading">
+                Sucesso!<br>Avançar para o próximo nível?
+            </div>
+            <div class="win-modal-stats" id="win-modal-stats">
+                <span id="win-stat-time">Tempo: 00:10</span>
+                <span id="win-stat-score">Pontos: +900</span>
+            </div>
             <div class="win-modal-actions">
-                <button type="button" class="nav-btn" onclick="window.Game.showScreen('screen-levels')">📋 Níveis</button>
-                <button type="button" class="next-btn" id="btn-next-level" onclick="window.Game.nextLevel()">Próximo Nível ➡</button>
+                <button type="button" class="win-pill-btn circle-back" title="Voltar ao nível" onclick="window.Game.hideFeedback()">←</button>
+                <button type="button" class="win-pill-btn" onclick="window.Game.showScreen('screen-levels')">Níveis</button>
+                <button type="button" class="win-pill-btn" id="btn-next-level" onclick="window.Game.nextLevel()">Próximo Nível</button>
             </div>
         </div>
     </div>
 
     <!-- TELA 4: OPÇÕES -->
     <section id="screen-options" class="screen">
-        <div class="screen-header" style="max-width: 520px;">
-            <button type="button" class="nav-btn" onclick="window.Game.showScreen('screen-menu')">⬅ Voltar</button>
+        <div class="screen-header" style="max-width: 560px;">
+            <button type="button" class="nav-btn" onclick="window.Game.showScreen('screen-menu')">
+                <span class="back-arrow">←</span> Voltar
+            </button>
             <h2 class="screen-title">Opções</h2>
-            <div style="width: 85px;"></div>
+            <div style="width: 90px;"></div>
         </div>
         <div class="modal-card">
             <div class="option-row">
@@ -98,13 +111,13 @@
             </div>
             <div class="option-row">
                 <span>Tema Visual</span>
-                <button type="button" class="toggle-btn" id="btn-toggle-theme" onclick="window.Game.toggleTheme()">Azul Clássico</button>
+                <button type="button" class="toggle-btn" id="btn-toggle-theme" onclick="window.Game.toggleTheme()">Azul Clássico ☀️</button>
             </div>
             <div class="option-row">
-                <span>Desbloquear Todos os Níveis (Modo Teste)</span>
-                <button type="button" class="toggle-btn" id="btn-toggle-unlock" onclick="window.Game.toggleUnlockAll()">Desativado</button>
+                <span>Modo Teste</span>
+                <button type="button" class="toggle-btn" id="btn-toggle-unlock" onclick="window.Game.toggleUnlockAll()">Desativado 🔒</button>
             </div>
-            <div class="option-row" style="border-bottom: none; padding-top: 15px;">
+            <div class="option-row" style="border-bottom: none; padding-top: 12px;">
                 <span>Progresso Salvo</span>
                 <button type="button" class="danger-btn" onclick="window.Game.resetProgress()">🗑️ Resetar Níveis</button>
             </div>
@@ -113,10 +126,12 @@
 
     <!-- TELA 5: CRÉDITOS -->
     <section id="screen-credits" class="screen">
-        <div class="screen-header" style="max-width: 520px;">
-            <button type="button" class="nav-btn" onclick="window.Game.showScreen('screen-menu')">⬅ Voltar</button>
+        <div class="screen-header" style="max-width: 560px;">
+            <button type="button" class="nav-btn" onclick="window.Game.showScreen('screen-menu')">
+                <span class="back-arrow">←</span> Voltar
+            </button>
             <h2 class="screen-title">Créditos</h2>
-            <div style="width: 85px;"></div>
+            <div style="width: 90px;"></div>
         </div>
         <div class="modal-card" style="line-height: 1.65; text-align: center;">
             <h3 style="font-size: 1.5rem; color: var(--accent-yellow);">Cartas Lógicas.py</h3>
